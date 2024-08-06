@@ -341,39 +341,24 @@ fun Modifier.tapToZoomVertical(
             )
         }
         .pointerInput(Unit) {
-            detectTransformGestures(true) { centroid, pan, zoom, rotation ->
-                val pair = if (pan.y > 0) {
-                    if (state.lazyState.canScrollBackward) {
-                        Pair(0f, pan.y)
-                    } else {
-                        Pair(pan.y, 0f)
-                    }
-                } else {
-                    if (state.lazyState.canScrollForward) {
-                        Pair(0f, pan.y)
-                    } else {
-                        Pair(pan.y, 0f)
-                    }
-                }
-                val nOffset = if (state.scale > 1f) {
-                    val maxT = (constraints.maxWidth * state.scale) - constraints.maxWidth
-                    val maxY = (constraints.maxHeight * state.scale) - constraints.maxHeight
-                    Offset(
-                        x = (state.offset.x + pan.x).coerceIn(
-                            minimumValue = (-maxT / 2) * 1.3f,
-                            maximumValue = (maxT / 2) * 1.3f
-                        ),
-                        y = (state.offset.y + pair.first).coerceIn(
-                            minimumValue = (-maxY / 2),
-                            maximumValue = (maxY / 2)
-                        )
+            detectTransformGestures { centroid, pan, zoom, rotation ->
+                if (state.isZoomEnable) {
+                    val newScale = (state.mScale * zoom).coerceIn(1f, 3f) // Limit zoom level between 1x and 3x
+                    val focusX = centroid.x - (constraints.maxWidth / 2f)
+                    val focusY = centroid.y - (constraints.maxHeight / 2f)
+                    val scaleChange = newScale / state.mScale
+
+                    val offsetX = (state.offset.x + focusX * (scaleChange - 1)) + pan.x * scaleChange
+                    val offsetY = (state.offset.y + focusY * (scaleChange - 1)) + pan.y * scaleChange
+
+                    val maxOffsetX = (constraints.maxWidth * (newScale - 1)) / 2
+                    val maxOffsetY = (constraints.maxHeight * (newScale - 1)) / 2
+
+                    state.mScale = newScale
+                    state.offset = Offset(
+                        offsetX.coerceIn(-maxOffsetX, maxOffsetX),
+                        offsetY.coerceIn(-maxOffsetY, maxOffsetY)
                     )
-                } else {
-                    Offset(0f, 0f)
-                }
-                state.offset = nOffset
-                coroutineScope.launch {
-                    state.lazyState.scrollBy((-pair.second / state.scale))
                 }
             }
         }
